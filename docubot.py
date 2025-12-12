@@ -1,42 +1,145 @@
-# Core DocuBot logic – a lightweight retrieval assistant.
+"""
+Core DocuBot class responsible for:
+- Loading documents from the docs/ folder
+- Building a simple retrieval index (Phase 1)
+- Retrieving relevant snippets (Phase 1)
+- Supporting retrieval only answers
+- Supporting RAG answers when paired with Gemini (Phase 2)
+"""
 
 import os
+import glob
 
 class DocuBot:
-    def __init__(self, folder_path="docs"):
-        self.folder_path = folder_path
-        self.documents = self.load_documents()
+    def __init__(self, docs_folder="docs", llm_client=None):
+        """
+        docs_folder: directory containing project documentation files
+        llm_client: optional Gemini client for LLM based answers
+        """
+        self.docs_folder = docs_folder
+        self.llm_client = llm_client
+
+        # Load documents into memory
+        self.documents = self.load_documents()  # List of (filename, text)
+
+        # Build a retrieval index (implemented in Phase 1)
+        self.index = self.build_index(self.documents)
+
+    # -----------------------------------------------------------
+    # Document Loading
+    # -----------------------------------------------------------
 
     def load_documents(self):
-        """Load .txt, .md, or .py files from the docs folder."""
+        """
+        Loads all .md and .txt files inside docs_folder.
+        Returns a list of tuples: (filename, text)
+        """
         docs = []
-        if not os.path.exists(self.folder_path):
-            print(f"Folder '{self.folder_path}' not found.")
-            return docs
-        
-        for file in os.listdir(self.folder_path):
-            if file.endswith((".txt", ".md", ".py")):
-                with open(os.path.join(self.folder_path, file), "r", encoding="utf-8") as f:
-                    docs.append((file, f.read()))
+        pattern = os.path.join(self.docs_folder, "*.*")
+        for path in glob.glob(pattern):
+            if path.endswith(".md") or path.endswith(".txt"):
+                with open(path, "r", encoding="utf8") as f:
+                    text = f.read()
+                filename = os.path.basename(path)
+                docs.append((filename, text))
         return docs
 
-    def retrieve(self, query):
-        """Retrieve relevant snippets based on a keyword match.
-        TODO: Improve this retrieval logic (e.g., score by frequency, chunk text, partial match)."""
+    # -----------------------------------------------------------
+    # Index Construction (Phase 1)
+    # -----------------------------------------------------------
+
+    def build_index(self, documents):
+        """
+        TODO (Phase 1):
+        Build a tiny inverted index mapping lowercase words to the documents
+        they appear in.
+
+        Example structure:
+        {
+            "token": ["AUTH.md", "API_REFERENCE.md"],
+            "database": ["DATABASE.md"]
+        }
+
+        Keep this simple: split on whitespace, lowercase tokens,
+        ignore punctuation if needed.
+        """
+        index = {}
+        # TODO: implement simple indexing
+        return index
+
+    # -----------------------------------------------------------
+    # Scoring and Retrieval (Phase 1)
+    # -----------------------------------------------------------
+
+    def score_document(self, query, text):
+        """
+        TODO (Phase 1):
+        Return a simple relevance score for how well the text matches the query.
+
+        Suggested baseline:
+        - Convert query into lowercase words
+        - Count how many appear in the text
+        - Return the count as the score
+        """
+        # TODO: implement scoring
+        return 0
+
+    def retrieve(self, query, top_k=3):
+        """
+        TODO (Phase 1):
+        Use the index and scoring function to select top_k relevant document snippets.
+
+        Return a list of (filename, text) sorted by score descending.
+        """
         results = []
-        for filename, text in self.documents:
-            if query.lower() in text.lower():
-                snippet = text[:500]  # basic preview
-                results.append((filename, snippet))
-        return results
+        # TODO: implement retrieval logic
+        return results[:top_k]
 
-    def assemble_answer(self, query, snippets):
-        """Build a response from retrieved context.
-        TODO: Improve formatting, add citations, add fallback if no results."""
+    # -----------------------------------------------------------
+    # Answering Modes
+    # -----------------------------------------------------------
+
+    def answer_retrieval_only(self, query, top_k=3):
+        """
+        Phase 1 retrieval only mode.
+        Returns raw snippets and filenames with no LLM involved.
+        """
+        snippets = self.retrieve(query, top_k=top_k)
+
         if not snippets:
-            return f"No relevant documentation found for '{query}'."
+            return "I do not know based on these docs."
 
-        output = [f"### Results for: '{query}'\n"]
-        for filename, snippet in snippets:
-            output.append(f"From **{filename}**:\n{snippet}\n")
-        return "\n".join(output)
+        formatted = []
+        for filename, text in snippets:
+            formatted.append(f"[{filename}]\n{text}\n")
+
+        return "\n---\n".join(formatted)
+
+    def answer_rag(self, query, top_k=3):
+        """
+        Phase 2 RAG mode.
+        Uses student retrieval to select snippets, then asks Gemini
+        to generate an answer using only those snippets.
+        """
+        if self.llm_client is None:
+            raise RuntimeError(
+                "RAG mode requires an LLM client. Provide a GeminiClient instance."
+            )
+
+        snippets = self.retrieve(query, top_k=top_k)
+
+        if not snippets:
+            return "I do not know based on these docs."
+
+        return self.llm_client.answer_from_snippets(query, snippets)
+
+    # -----------------------------------------------------------
+    # Bonus Helper: concatenated docs for naive generation mode
+    # -----------------------------------------------------------
+
+    def full_corpus_text(self):
+        """
+        Returns all documents concatenated into a single string.
+        This is used in Phase 0 for naive 'generation only' baselines.
+        """
+        return "\n\n".join(text for _, text in self.documents)
