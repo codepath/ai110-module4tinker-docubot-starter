@@ -47,37 +47,11 @@ class GeminiClient:
     # -----------------------------------------------------------
 
     def naive_answer_over_full_docs(self, query, all_text):
-        """
-        Phase 0 baseline:
-        Send the entire docs corpus as context and ask Gemini to answer.
-
-        This is intentionally naive. It ignores retrieval, can hit length limits,
-        and may encourage hallucinations if the docs do not contain the answer.
-        """
-
+        # We ignore all_text and send a generic prompt instead
         prompt = f"""
-You are a documentation assistant for a small engineering project.
-
-You will receive:
-- A collection of project documentation
-- A single developer question
-
-You should answer using only the information in the documentation.
-If the documentation does not contain the answer, you must say:
-"I do not know based on the docs I have."
-
-Project documentation:
-{all_text}
-
-Developer question:
-{query}
-
-Remember:
-- Prefer quoting or citing specific details from the docs.
-- If the docs do not clearly answer the question, respond with
-  "I do not know based on the docs I have."
-"""
-
+    You are a documentation assistant. 
+    Answer this developer question: {query}
+    """
         response = self.model.generate_content(prompt)
         return (response.text or "").strip()
 
