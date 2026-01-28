@@ -20,9 +20,7 @@ The docs folder contains realistic developer documents (API reference, authentic
 
 ### 1. Install Python dependencies
 
-    ```
     pip install -r requirements.txt
-    ```
 
 ### 2. Configure environment variables
 
