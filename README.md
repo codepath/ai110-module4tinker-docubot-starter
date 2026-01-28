@@ -26,15 +26,11 @@ The docs folder contains realistic developer documents (API reference, authentic
 
 Copy the example file:
 
-    ```bash
     cp .env.example .env
-    ```
 
 Then edit `.env` to include your Gemini API key:
 
-    ```plaintext
     GEMINI_API_KEY=your_api_key_here
-    ```
 
 If you do not set a Gemini key, you can still run retrieval only mode.
 
@@ -44,9 +40,7 @@ If you do not set a Gemini key, you can still run retrieval only mode.
 
 Start the program:
 
-    ```bash
     python main.py
-    ```
 
 Choose a mode:
 
@@ -60,9 +54,7 @@ You can use built in sample queries or type your own.
 
 ## Running Retrieval Evaluation (optional)
 
-    ```bash
     python evaluation.py
-    ```
 
 This prints simple retrieval hit rates for sample queries.
 
