@@ -69,7 +69,7 @@ class GeminiClient:
         Phase 2:
         Generate an answer using only the retrieved snippets.
 
-        snippets: list of (filename, text) tuples selected by DocuBot.retrieve
+        snippets: list of (filename, heading, text) tuples selected by DocuBot.retrieve
 
         The prompt:
         - Shows each snippet with its filename
@@ -81,8 +81,8 @@ class GeminiClient:
             return "I do not know based on the docs I have."
 
         context_blocks = []
-        for filename, text in snippets:
-            block = f"File: {filename}\n{text}\n"
+        for filename, heading, text in snippets:
+            block = f"File: {filename} - {heading}\n{text}\n"
             context_blocks.append(block)
 
         context = "\n\n".join(context_blocks)
@@ -107,8 +107,10 @@ Developer question:
 Rules:
 - Use only the information in the snippets. Do not invent new functions,
   endpoints, or configuration values.
-- If the snippets are not enough to answer confidently, reply exactly:
-  "I do not know based on the docs I have."
+- If the snippets contain partial but relevant information, give that answer
+  and clearly note what context is missing.
+- Only reply exactly "I do not know based on the docs I have." if the snippets
+  have no relevant information at all.
 - When you do answer, briefly mention which files you relied on.
 """
 

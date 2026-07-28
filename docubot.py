@@ -9,6 +9,7 @@ Core DocuBot class responsible for:
 
 import os
 import glob
+import string
 
 class DocuBot:
     def __init__(self, docs_folder="docs", llm_client=None):
@@ -21,6 +22,9 @@ class DocuBot:
 
         # Load documents into memory
         self.documents = self.load_documents()  # List of (filename, text)
+
+        # Identify smaller chunks of documents
+        self.chunks = self.chunk_documents(self.documents)
 
         # Build a retrieval index (implemented in Phase 1)
         self.index = self.build_index(self.documents)
@@ -48,9 +52,37 @@ class DocuBot:
     # Index Construction (Phase 1)
     # -----------------------------------------------------------
 
+    def chunk_documents(self, documents):
+        """
+        Splits each document into sections based on markdown headers.
+        Returns a list of (filename, heading, text) tuples.
+        """
+        chunks = []
+        for filename, text in documents:
+            lines = text.split("\n")
+            current_heading = "(intro)"
+            current_lines = []
+
+            for line in lines:
+                if line.startswith("#"):
+                    section_text = "\n".join(current_lines).strip()
+                    if section_text:
+                        chunks.append((filename, current_heading, section_text))
+                    current_heading = line.lstrip("#").strip()
+                    current_lines = [line]
+                else:
+                    current_lines.append(line)
+                
+            # Flush the last section
+            section_text = "\n".join(current_lines).strip()
+            if section_text:
+                chunks.append((filename, current_heading, section_text))
+
+        return chunks
+
     def build_index(self, documents):
         """
-        TODO (Phase 1):
+        (Phase 1):
         Build a tiny inverted index mapping lowercase words to the documents
         they appear in.
 
@@ -64,16 +96,26 @@ class DocuBot:
         ignore punctuation if needed.
         """
         index = {}
-        # TODO: implement simple indexing
+        for filename, text in documents:
+            for word in text.split():
+                token = word.lower().strip(".,:#`\"'()-[]{}*/\\")
+                if token and filename not in index.get(token, []):
+                    index.setdefault(token, []).append(filename)
         return index
 
     # -----------------------------------------------------------
     # Scoring and Retrieval (Phase 1)
     # -----------------------------------------------------------
 
+    def _stem(self, word):
+        for suffix in ("ation", "tion", "ing", "ed", "ion"):
+            if len(word) > len(suffix) + 3 and word.endswith(suffix):
+                return word[:-len(suffix)]
+        return word
+
     def score_document(self, query, text):
         """
-        TODO (Phase 1):
+        (Phase 1):
         Return a simple relevance score for how well the text matches the query.
 
         Suggested baseline:
@@ -81,19 +123,34 @@ class DocuBot:
         - Count how many appear in the text
         - Return the count as the score
         """
-        # TODO: implement scoring
-        return 0
+        STOP_WORDS = {"are", "is", "the", "a", "an", "in", "of", "to", "do", "i",
+              "how", "what", "why", "when", "where", "does", "can", "will"}
+        
+        query_words = [
+            self._stem(w.strip(string.punctuation))
+            for w in query.lower().split()
+            if w.strip(string.punctuation) not in STOP_WORDS]
+        text_words = set()
+        for w in text.lower().split():
+            parts = w.strip(string.punctuation).replace("_", " ").split()
+            text_words.update(self._stem(p) for p in parts)
+        return sum(1 for word in query_words if word in text_words)
 
-    def retrieve(self, query, top_k=3):
+    def retrieve(self, query, top_k=3, min_score=1):
         """
-        TODO (Phase 1):
+        (Phase 1):
         Use the index and scoring function to select top_k relevant document snippets.
 
         Return a list of (filename, text) sorted by score descending.
         """
         results = []
-        # TODO: implement retrieval logic
-        return results[:top_k]
+        for filename, heading, text in self.chunks:
+            score = self.score_document(query, heading + " " + text)
+            if score >= min_score:
+                results.append((filename, heading, text, score))
+        
+        results.sort(key=lambda x: x[3], reverse=True)
+        return [(filename, heading, text) for filename, heading, text, _ in results[:top_k]]
 
     # -----------------------------------------------------------
     # Answering Modes
@@ -110,8 +167,8 @@ class DocuBot:
             return "I do not know based on these docs."
 
         formatted = []
-        for filename, text in snippets:
-            formatted.append(f"[{filename}]\n{text}\n")
+        for filename, heading, text in snippets:
+            formatted.append(f"[{filename} - {heading}]\n{text}\n")
 
         return "\n---\n".join(formatted)
 
